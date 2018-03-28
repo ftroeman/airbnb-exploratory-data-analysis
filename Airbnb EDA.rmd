@@ -1,0 +1,877 @@
+Airbnb Exploration by Fernando Troeman
+========================================================
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load all of the packages that you end up using in your analysis in this code
+# chunk.
+
+# Notice that the parameter "echo" was set to FALSE for this code chunk. This
+# prevents the code from displaying in the knitted HTML output. You should set
+# echo=FALSE for all code chunks in your file, unless it makes sense for your
+# report to show the code that generated a particular plot.
+
+# The other parameters for "message" and "warning" should also be set to FALSE
+# for other code chunks once you have verified that each plot comes out as you
+# want it to. This will clean up the flow of your report.
+
+library(memisc)
+library(dplyr)
+library(ggplot2)
+library(GGally)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Load the Data
+airbnb_full = read.csv('Airbnb NY Dataset.csv')
+airbnb = subset(airbnb_full, select=c('neighbourhood_group_cleansed', 
+                                      'room_type', 'accommodates', 'bedrooms', 
+                                      'price', 'guests_included', 
+                                      'availability_365', 'number_of_reviews', 
+                                      'review_scores_rating', 
+                                      'cancellation_policy', 
+                                      'reviews_per_month'))
+colnames(airbnb)[1] <- 'borough'
+colnames(airbnb)[9] <- 'review_score'
+```
+
+The dataset we are exploring contains Airbnb listings data for New York City, 
+updated as of 02 October, 2017. It provides listing details such as the number 
+of bed and bathrooms, reviews and ratings, and price per night. It contains a 
+total of 44,317 Airbnb listings with up to 96 features for each listing. 
+However, we will only be conducting a deep-dive into 11 of these features.
+
+# Univariate Plots Section
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Plots}
+ggplot(aes(x = reorder(borough, borough, length)), data = airbnb) + 
+  geom_histogram(stat="count") +
+  xlab("Boroughs") +
+  ylab("Number of Listings")
+```
+
+Most of the Airbnb listings in New York City are concentrated in the boroughs 
+of Manhattan and Brooklyn, an expected observation given that Airbnb is mainly 
+utilized by travellers and tourists who would generally find these two boroughs 
+more attractive. We can also reasonably deduce that the availability of listings
+are dictated by demand rather than supply, as the number of listings in each 
+borough are incommensurate with its population. 2016 figures show that in terms 
+of population, Queens (2.3 million) is second only to Brooklyn (2.6 million). 
+Furthermore, the Bronx (1.5 million) does not lag far behind Manhattan 
+(1.6 million). 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=reorder(room_type, room_type, length)), data=airbnb) +
+  geom_histogram(stat="count") +
+  xlab("Room Type") +
+  ylab("Number of Listings")
+```
+
+The histogram above tells us that listings offering an entire home/apartment or 
+private rooms are by far more popular than listings offering shared rooms. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=cancellation_policy), data=subset(airbnb, cancellation_policy 
+                                               %in% c("flexible", "moderate", 
+                                                      "strict"))) +
+  geom_histogram(stat="count") +
+  xlab("Cancellation Policy") +
+  ylab("Number of Listings")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(airbnb$cancellation_policy)
+```
+
+In the histogram above, we filtered out listings with obscure cancellation 
+policies - a total of 17 listings split between 3 categories. For cancellation 
+policies classified as Flexible, Moderate or Strict, we see that most listings 
+have a Strict cancellation policy.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=price), data=airbnb) +
+  geom_histogram(binwidth=100) +
+  xlab("Price") +
+  ylab("Number of Listings")
+```
+
+A plot of price presents us with long-tailed data as there are a few ultra 
+high-end rentals causing the histogram to be skewed greatly. A logarithmic 
+transformation of the data, as shown below, provides a much clearer picture of 
+the price distribution. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=price), data=airbnb) +
+  geom_histogram(binwidth=0.05) +
+  scale_x_log10() +
+  xlab("Price") +
+  ylab("Number of Listings")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(airbnb$price)
+```
+
+We see that 50% of all prices are between \$70 and \$175. More in-depth 
+multivariate analysis on prices will be conducted, as we seek to examine how 
+price might vary across a number of factors, such as the number of rooms, 
+location, and review scores.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=accommodates), data=airbnb) +
+  geom_histogram(stat="count") + 
+  scale_x_continuous(breaks = seq(1,16,1)) +
+  xlab("Number of People Listing Accommodates") +
+  ylab("Number of Listings")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=guests_included), data=airbnb) +
+  geom_histogram(stat="count") + 
+  scale_x_continuous(breaks = seq(1,16,1)) +
+  xlab("Number of Guests Included in Listing Reservation") +
+  ylab("Number of Listings")
+```
+
+From the plots above, we see that most listings accommodate up to 2 people. 
+However, we also see that, usually, only 1 guest is included in a reservation 
+for any listing. As there are often extra charges for additional guests, this 
+is an indication of potential 'hidden costs'.
+
+Moving on, we take a look at the review scores assigned to listings by Airbnb 
+users.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=review_score), data=subset(airbnb, 
+                                                !is.na(review_score))) +
+  geom_histogram(stat="count") +
+  xlab("Review Score Ratings") +
+  ylab("Number of Listings")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(subset(airbnb, !is.na(review_score))$review_score)
+```
+
+An initial overview of review score ratings (for listings with at least 1 
+review) tells us that most listings have a score rating of 100. The median 
+review score is 96.00 while the mean is 93.49.
+
+However, if we establish a strict criteria and only look at listings with 
+more than 10 reviews, a more realistic picture emerges and the proportion of 
+listings with a score of 100 dips drastically.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=review_score), data=subset(airbnb, 
+                                                !is.na(review_score) & 
+                                                  number_of_reviews > 10)) +
+  geom_histogram(stat="count") +
+  xlab("Review Score Ratings (for Listings with >10 Reviews)") +
+  ylab("Number of Listings")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(subset(airbnb, !is.na(review_score) & 
+                 number_of_reviews > 10)$review_score)
+```
+
+For listings with more than 10 reviews, the median review score drops to 94.00 
+but the mean review score remains the same at 93.49. The resultant plot and the 
+unchanged mean suggest that the criteria implemented not only removed many 
+listings with a perfect review score, but also listings with anomalously low 
+review scores. Later on, we will continue to further investigate the 
+relationship between price and review scores, as one might expect listing owners
+to charge higher prices for well-received listings.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=reviews_per_month), data=subset(airbnb, 
+                                             !is.na(reviews_per_month))) +
+  geom_histogram(binwidth=0.05) +
+  scale_x_log10() +
+  xlab('Reviews per Month') +
+  ylab('Number of Listings')
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(airbnb$reviews_per_month)
+```
+
+On average, each listing receives 1.446 reviews per month. The median number of 
+reviews per month is 0.870. The number of reviews each listing received per 
+month is useful as it helps us get a sense of the frequency of bookings for any 
+particular listing - Airbnb has stated that 70% of all stays end up with a 
+review.
+
+Next, we will have a look at the distribution of listings that have been active 
+(available to book for at least 1 day) within the past year.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=availability_365), data=subset(airbnb, availability_365 != 0)) +
+  geom_histogram(stat = "count") +
+  xlab('Number of Days Available') +
+  ylab('Number of Listings')
+```
+
+49% of Airbnb listings located in New York City have been available for a total 
+of 0 days (out of the previous 365 days ending on 02 October, 2017) - taking 
+those listings into account while plotting listing availability would present a 
+highly skewed figure. As a result, we generated a plot of listing availability 
+for listings that have been available for booking for at least one day within 
+the past year. We see that the modal availability is 365 days.
+
+# Univariate Analysis
+
+### What is the structure of your dataset?
+
+The dataset consists of 44,317 Airbnb listings in New York City. There are a 
+total of 96 features, but we will only be taking a deep dive into 11 of those 
+features.
+
+These 11 features are as follows:
+  1. Borough
+  2. Room Type
+  3. Number of People Listing Accommodates
+  4. Number of Bedrooms
+  5. Price
+  6. Number of Guests Included
+  7. Number of Days Available (Within The Past Year)
+  8. Number of Reviews
+  9. Review Score
+  10. Cancellation Policy
+  11. Number of Reviews per Month
+
+### What is/are the main feature(s) of interest in your dataset?
+
+This exploratory analysis primarily aims to examine the relationship between 
+price and the various features of any particular listing. Factors that are 
+expected to have a big impact on price include location and the number of 
+bedrooms.
+
+In the process of identifying relevant factors contributing to the price of a 
+listing, I am hopeful of discovering some peripheral factors that have an 
+unexpectedly large impact on the price of a listing.
+
+### What other features in the dataset do you think will help support your \
+investigation into your feature(s) of interest?
+
+Some other factors that could potentially have a significant influence on the 
+price of a listing include the availability of the listing, review scores, 
+cancellation policy and the frequency of bookings at the listing.
+
+### Did you create any new variables from existing variables in the dataset?
+
+No.
+
+### Of the features you investigated, were there any unusual distributions? \
+Did you perform any operations on the data to tidy, adjust, or change the form \
+of the data? If so, why did you do this?
+
+An initial investigation of the data revealed that as much as 49% of the 
+listings had not been available for booking in the 365 days ending on 
+02 October, 2017. This prompts caution when conducting analysis relevant to 
+the availability of Airbnb listings, as some of the data pertaining to inactive
+listings might be outdated.
+
+The data was also occasionally adjusted to group the listings by certain 
+features and then to extract statistics and insights from these groups.
+
+# Bivariate Plots Section
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=10}
+ggpairs(subset(airbnb, select=-c(room_type, number_of_reviews)))
+```
+
+Firstly, we would like to test our hypothesis that location and the number of 
+bedrooms are the biggest determinants of the price of an Airbnb listing.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=borough, y=price), data=airbnb) +
+  geom_boxplot() +
+  coord_cartesian(ylim=c(0,250)) +
+  xlab("Borough") +
+  ylab("Price")
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=bedrooms, y=price, group=bedrooms), data=airbnb) +
+  geom_boxplot() +
+  coord_cartesian(ylim = c(0,1500), xlim = c(0,10)) +
+  scale_x_continuous(breaks=seq(0,10,1)) +
+  xlab("Number of Bedrooms") +
+  ylab("Price")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=bedrooms, y=price), data=airbnb) +
+  scale_y_log10() +
+  geom_line(stat="summary", fun.y=median) +
+  scale_x_continuous(breaks=seq(0,16,1)) +
+  xlab("Number of Bedrooms") +
+  ylab("Median Price")
+```
+
+The plots above support the claim that being located in a desirable borough 
+(Manhattan or Brooklyn) and having a large number of bedrooms are indicative 
+of an expensive listing.
+
+With regard to the number of bedrooms, statistical calculations tell a similar 
+story:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cor.test(airbnb$bedrooms, airbnb$price)
+```
+
+The small p-value lends credibility to our argument that the number of bedrooms 
+is a statistically significant predictor of the price of a listing. However, the 
+R-squared value of 0.08 obtained suggests that the number of bedrooms alone is 
+insufficient to form a predictive model.
+
+From here, we can proceed with investigating the correlation between price and 
+several other factors. Below is a plot of the availability of a listing (within 
+the 365 days ending on 02 October, 2017) and its price.
+
+We might reasonably hypothesize that listings that are used by owners to exploit
+a short-term vacancy of their property could be listed at a different price than 
+listings of property whose purpose is to generate income through Airbnb 
+throughout the year.
+
+In the following analysis, we only take into account listings that are active 
+within the past year (available for booking in at least 1 day out of 365).
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=availability_365, y=price), data=subset(airbnb, 
+                                                     availability_365 > 0)) +
+  geom_jitter(alpha=1/4) +
+  ylim(0, quantile(airbnb$price, 0.99)) +
+  xlab('Number of Days Available') +
+  ylab('Price')
+```
+
+There seems to be no discernible relationship between a listing's availability 
+and price. It appears that listings which are exclusively used year-round for 
+Airbnb rental purposes are no more or less expensive than listings that are put 
+up simply to fill a temporary vacancy.
+
+Another factor that might affect the price of listings is its review score. 
+These are the scores assigned by visitors of any particular listing. A listing 
+with high review scores will attract more prospective visitors and tenants, and 
+as such it will be interesting to examine if hosts with highly-reviewed listings 
+set a higher price to exploit the popularity and attractiveness of their homes.
+
+We will only be examining homes with more than 10 reviews.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=review_score, y=price), 
+       data=subset(airbnb, number_of_reviews > 10)) +
+  geom_jitter(alpha=1/4) +
+  ylim(0, quantile(airbnb$price, 0.99)) +
+  xlab('Review Score') +
+  ylab('Price')
+```
+
+We can see from the plot that there seems to be some evidence to support the 
+claim that higher review scores relate to higher prices. A causal relationship 
+cannot, however, be definitively proven.
+
+Naturally, the number of guests included in a listing must have an impact on 
+the price of a listing. The greater the number of guests a host is expected to 
+cater, the higher the cost should be to the visitors. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=guests_included, y=price, group=guests_included), data=airbnb) + 
+  geom_boxplot() + 
+  ylim(0, quantile(airbnb$price, 0.99)) + 
+  xlim(0, 12.5) +
+  xlab('Guests Included') +
+  ylab('Price')
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cor.test(airbnb$price, airbnb$guests_included)
+```
+
+The boxplot above confirms our assertion that a greater number of guests 
+included in any particular listing translates to a higher price.
+
+Airbnb states that 70% of all visits end up with a review. This means that we 
+can at least expect the trend for the number of reviews per month to be closely 
+associated with the trend for visits per month. With this knowledge, we can 
+examine if cheaper listings do indeed attract more bookings.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=reviews_per_month, y=price), data=subset(airbnb)) +
+  geom_jitter(alpha=1/4) +
+  ylim(c(0,quantile(airbnb$price, 0.99))) +
+  xlab('Reviews per Month') +
+  ylab('Price')
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cor.test(airbnb$price, airbnb$reviews_per_month)
+```
+
+Although the scatterplot above suggests a trend, the calculations show a very 
+weak correlation between price and the number of reviews per month a listing 
+receives. This finding, surprisingly, means that listings with lower prices 
+might not necessarily attract more bookings. This does not necessarily suggest 
+that Airbnb users are price inelastic when it comes to paying for lodging while 
+travelling. It is entirely plausible that the budget of Airbnb users is highly 
+variable, and that the service caters to more than just travellers looking for 
+low-cost alternatives to hotels.
+
+Another relevant relationship that we can investigate is the one between the 
+number of reviews per month and the review scores of listings. Essentially, we 
+are asking the quesiton: Are more highly-rated listings attracting more 
+visitors?
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=reviews_per_month, y=review_score), data=airbnb) +
+  geom_jitter(alpha=1/4) +
+  xlab('Reviews per Month') +
+  ylab('Review Score')
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cor.test(airbnb$reviews_per_month, airbnb$review_score)
+```
+
+The answer, contrary to expectations, is no - more highly reviewed listings does 
+not necessarily attract more bookings. Again, although the plot initially 
+suggests a positive relationship between the two features, calculations shows 
+that the correlation is extremely weak. Surprisingly, the data shows us that 
+listings with high or perfect review scores are not necessarily more frequently 
+reviewed (and thus not more frequently visited) than listings with lower review 
+scores. This begs the question: If price and reviews are not the main 
+determinants of the number of bookings a listing receives, what is?
+
+Moving forward, we explore the relationship between price and cancellation 
+policy. A listing with a flexible cancellation policy might be expected to come 
+with a price premium. A suitable analogy are prices for hotel rooms, where lower 
+rates are often offered for bookings that are non-refundable.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+airbnb.price_by_cancel <- airbnb %>%
+  filter(cancellation_policy %in% c("flexible", "moderate", "strict")) %>%
+  group_by(cancellation_policy) %>%
+  summarise(mean_price = mean(price),
+           median_price = median(price),
+           n = n())
+head(airbnb.price_by_cancel)
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=cancellation_policy, y=price), 
+       data=subset(airbnb, cancellation_policy %in% 
+                     c("flexible", "moderate", "strict"))) +
+  geom_boxplot() +
+  coord_cartesian(ylim=c(0,250)) +
+  xlab('Cancellation Policy') + 
+  ylab('Price')
+```
+
+
+The plot above shows that stricter cancellation policies does not necessarily 
+translate to lower prices. In fact, the data suggests that the opposite might 
+even be true. The median and mean prices for listings with a strict cancellation 
+policy are considerably higher than those with a flexible or moderate 
+cancellation policy.
+
+From the scatterplot matrix illustrated earlier, there are several other 
+interesting relationships to explore between a listing's features. One 
+relationship that stands out is the one between a listing's availability 
+and its cancellation policy.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+airbnb.availability_by_cancel <- airbnb %>%
+  filter(availability_365 > 0 & cancellation_policy %in% 
+           c("flexible", "moderate", "strict")) %>%
+  group_by(cancellation_policy) %>%
+  summarise(mean_availability = mean(availability_365),
+           median_availability = median(availability_365),
+           n = n())
+head(airbnb.availability_by_cancel)
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=cancellation_policy, y=availability_365), 
+       data=subset(airbnb, availability_365 > 0 & cancellation_policy %in% 
+                     c("flexible", "moderate", "strict"))) +
+  geom_boxplot() +
+  xlab('Cancellation Policy') +
+  ylab('Number of Days Available')
+```
+
+We observe that listings with higher availability tend to have a stricter 
+cancellation policy. The reasons behind this are not immediately obvious. One 
+could reasonably suggest that for homes used exclusively to generate income for 
+Airbnb, the lack of a strict cancellation policy could lead to volatile 
+fluctuations in the hosts' expected income. As these hosts place greater 
+reliance on the income from their Airbnb homes, they thus demand greater 
+commitment on the visitors' part in exchange for the flexible schedule they 
+offer. Note that we only considered listings that were available for at least 
+one day within the past year.
+
+Below, we proceed to examine the variations in availability for listings in the 
+different boroughs.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+airbnb.availability_by_borough <- airbnb %>%
+  filter(availability_365 > 0) %>%
+  group_by(borough) %>%
+  summarise(mean_availability = mean(availability_365),
+           median_availability = median(availability_365),
+           n = n())
+head(airbnb.availability_by_borough)
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=borough, y=availability_365), 
+       data=subset(airbnb, availability_365 > 0)) +
+  geom_boxplot() +
+  ylab('Number of Days Available') +
+  xlab('Borough')
+```
+
+We see that listings in Staten Island and the Bronx tend to be more widely 
+available in terms of schedule, while listings in Brooklyn and Manhattan tend 
+to be less frequently available for booking. On average, listings in Brooklyn 
+and Manhattan were only available for 191 and 185 days respectively over the 
+past year. This compares unfavorably to Staten Island, where the average is 250 
+days.
+
+# Bivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. How did the feature(s) of interest vary with other features in \
+the dataset?
+
+As expected, the location and size of each listing provides a good indication of 
+an Airbnb's relative price. Listings in Manhattan and Brooklyn are indeed more 
+expensive. We also see that listings with a greater number of bedrooms tend to 
+be priced higher.
+
+Moreover, we also found that a listing's review score, number of guests included 
+and cancellation policy are also indicative of price in a specific direction. 
+Higher review scores and a greater amount of guests included both relate to 
+higher prices. Expensive listings also tend to have a stricter cancellation 
+policy.
+
+
+### Did you observe any interesting relationships between the other features \
+(not the main feature(s) of interest)?
+
+There seems to be a relationship between a listing's availability and its 
+cancellation policy. Listings that are available for more days in a year tend to
+have stricter cancellation policies. This disparity is even greater if we take 
+into account listings that have not been active (available for at least a day) 
+in the 365 days ending on 02 October, 2017.
+
+Another interesting observation is that a listing's popularity appears to be 
+independent of its price. Cheaper listings does not equate to greater demand for 
+those listings.
+
+Also, great reviews do not seem to guarantee frequent visitors, as our analysis 
+found that listings with high or perfect review scores do not attract 
+significantly more bookings than listings with lower scores.
+
+### What was the strongest relationship you found?
+
+The strongest relationship found was the positive relationship between price and
+the number of bedrooms.
+
+# Multivariate Plots Section
+
+In our following analysis concerning the number of bedrooms, we only focus on 
+listings with 5 or less bedrooms, as this consists of the majority and prevents 
+bigger and more expensive listings to skew our results in any way.
+
+```{r echo=FALSE, Multivariate_Plots}
+ggplot(aes(x=bedrooms, y=price), 
+       data = subset(airbnb, room_type='Entire home/apt')) +
+  geom_line(stat='summary', fun.y=median, 
+            aes(color = borough)) +
+  labs(color="Neighbourhood") +
+  xlab('Number of Bedrooms') +
+  ylab('Median Price') +
+  xlim(c(0,5))
+```
+
+As extra bedrooms are only relevant for a listing that provides an entire home 
+or apartment, we did not include listings offering only a shared or private room 
+in this analysis.
+
+The above plot lends support to our conclusion that listings in Manhattan and 
+Brooklyn are generally more expensive than the listings in the remaining 
+boroughs. For Manhattan, this is especially true for homes with a higher number 
+of bedrooms.
+
+The plot also illustrates that the price premium attached to listings in 
+Manhattan are, unsurprisingly, the most significant. The gap between the price 
+of Manhattan listings and those of other boroughs is evident, and this gap 
+increases disproportionately as the number of bedrooms in the listing increases.
+
+On the other hand, the premium on listings in Brooklyn is much less significant, 
+as the median price of listings across all number of bedrooms is not far from 
+that of listings in Queens.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=bedrooms, y=price), data = subset(airbnb, cancellation_policy %in% 
+                                                 c('flexible', 'moderate', 
+                                                      'strict'))) +
+  geom_line(stat='summary', fun.y=median, aes(color = cancellation_policy)) +
+  labs(color="Cancellation Policy") +
+  xlab('Number of Bedrooms') +
+  ylab('Median Price') +
+  xlim(c(0,5))
+
+ggplot(aes(x=bedrooms, y=price, group=bedrooms), data = subset(airbnb, cancellation_policy %in% 
+                                                 c('flexible', 'moderate', 
+                                                      'strict'))) +
+  geom_boxplot() +
+  xlab('Number of Bedrooms') +
+  ylab('Median Price') +
+  facet_wrap(~cancellation_policy) +
+  scale_x_continuous(limits=c(-0.5,5.5), breaks=seq(0,5,1)) +
+  ylim(c(0, quantile(airbnb$price, 0.95)))
+```
+
+The line chart above illustrates our discovery that listings with a stricter 
+cancellation policy tend to be more expensive, regardless of the size of the 
+listing.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=review_score, y=price), 
+       data=subset(airbnb, number_of_reviews > 10 & 
+                     price < quantile(airbnb$price, 0.99))) +
+  geom_jitter(alpha=1/4) +
+  facet_wrap(~borough, scales='free') +
+  xlab('Review Score') + 
+  ylab('Price')
+```
+
+From the plots above, we see that in all boroughs, most of the listings have 
+review scores of between 80-100. Keep in mind that the plots above are generated 
+for listings with more than 10 reviews and whose price is under the 99th 
+percentile of listings in each borough.
+
+This observation seems consistent over all boroughs, regardless of the price 
+differences of listings between boroughs. The higher prices of listings in 
+Manhattan and Brooklyn does not seem to impact this range, as expensive listings 
+do not have signficantly better or worse scores than other listings. 
+
+Earlier in the report, we posited that the impact of a listing's number of 
+bedrooms differ greatly for listings that offer entire homes and listings that 
+only offer private or shared rooms. 
+
+Here, we examine the relationship between price and bedrooms given the room type 
+provided by a particular listing. We will take into account only listings with 6 
+or less bedrooms, as the listings offering private rooms have a maximum size of 
+only 6 bedrooms. Furthermore, we will not consider shared rooms in our analysis 
+as the sample size is relatively insignificant.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x=bedrooms, y=price), data=subset(airbnb, bedrooms <= 6 & 
+                                               room_type != 'Shared room')) +
+  geom_line(aes(color=room_type), stat='summary', fun.y='median') +
+  labs(color="Room Type") +
+  xlab('Number of Bedrooms') +
+  ylab('Price')
+```
+
+The relationship between the median price of listings and the number of bedrooms 
+is completely unsimilar for entire homes and private rooms. There is an obvious 
+upward trend for listings that offer the entire home, while the number of 
+bedrooms does not seem to have any impact when the listing is only offering a 
+single room for use.
+
+Earlier, we plotted the number of bedrooms in a listing against its price and 
+found that there seemed to be a rather significant positive correlation between 
+the two features. However, when we consider the fact that analysis done on the 
+number of bedrooms thus far includes listings that offer private rooms and 
+shared rooms, we see now that our methodology is somewhat flawed. 
+
+As we have demonstrated above, for private rooms and shared rooms, the number of 
+bedrooms in the listing should be significantly less important than if the 
+listing is for the entire home. Regardless of the listing's size, any 
+prospective visitor will only be paying for a single room. As such, we would 
+expect to arrive at more convincing figures if we exclude listings for private 
+and shared rooms.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m1 <- lm(formula = price ~ bedrooms, data = subset(airbnb, room_type == 
+                                                     'Entire home/apt'))
+mtable(m1)
+```
+
+The resultant numbers confirms our suspicion, and we do indeed obtain stronger 
+evidence for the positive relationship between price and the number of bedrooms 
+when we only take into account listings that offer an entire home or apartment.
+
+Using what we have learnt so far, we attempt to build a mathematical model that 
+might help in predicting the price of an Airbnb listing when given relevant 
+features.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m1 <- lm(formula = price ~ bedrooms, data=airbnb)
+m2 <- update(m1, ~ . + review_score)
+m3 <- update(m2, ~ . + guests_included)
+m4 <- update(m3, ~ . + room_type)
+m5 <- update(m4, ~ . + borough)
+mtable(m1, m2, m3, m4, m5)
+```
+
+We were able to build a decent but insufficient model in predicting the price of 
+Airbnb listings. Ultimately, I would assert that any quantitative attempt to 
+form an accurate predictive model of Airbnb listing prices will be somewhat 
+flawed as the most important indicator of price is the aesthetic of the home 
+listed. Our willingness to pay is still largely influenced by our impression of 
+the photographs of the listings. Listings with high quality photographs of a 
+beautiful home will undoubtedly command a higher price. The quality of the 
+photographs, however, is not a quantifiable feature that we can account for in 
+our calculations. Furthermore, taste is a highly subjective matter.
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. Were there features that strengthened each other in terms of \
+looking at your feature(s) of interest?
+
+The significance of location in determining a listing's price is enhanced when 
+we examined it across listings with different numbers of bedrooms. We notice 
+that the price premium for listings in Manhattan increases with the number of 
+bedrooms. This is unsurprising as homes with numerous bedrooms are especially 
+difficult to find in Manhattan. We also found that the premium for listings in 
+Brooklyn is not as significant as we might have previously thought.
+
+Also, when considering only listings that offer an entire home or apartment, the 
+correlation between price and the number of bedrooms grows signficantly 
+stronger. This is because we have shown that there is little or no correlation 
+between price and number of bedrooms for listings offering only private or 
+shared rooms. This makes absolute sense as it hardly matters how large a home is 
+if the visitor is only paying for and utilizing a single room.
+
+### Were there any interesting or surprising interactions between features?
+
+The observation that listings with a strict cancellation policy tend to be 
+slightly more expensive than listings with a flexible or moderate cancellation 
+policy is rather surprising, and goes against what we know about traditional 
+lodging options such as hotels. In hotels, discounted rates are usually 
+accompanied by strict cancellation policies where the amount paid is 
+non-refundable. When it comes to Airbnb listings, however, we observe a 
+contradictory trend but without a satisfactory explanation.
+
+However, this apparent premium that we observe is negligible, and attempting to 
+add a listing's cancellation policy into our model does not improve it much, or 
+at all.
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the \
+strengths and limitations of your model.
+
+We did attempt to create a model of Airbnb listing prices. However, our model 
+does not seem to be sufficient or satisfactory in predicting the price of Airbnb 
+listings given the relevant features. An R-squared value of 0.207 suggests that 
+the features we have included are insufficient in providing a reliable model of 
+Airbnb listing prices. An important limitation of our model is that listings 
+that have not been rated by visitors were not taken into consideration, as 
+review scores are an important feature of our model.
+
+------
+
+# Final Plots and Summary
+
+### Plot One
+```{r echo=FALSE, Plot_One}
+ggplot(aes(x=price), data=airbnb) +
+  geom_histogram(binwidth=0.05, fill=I('#FFA500')) +
+  scale_x_log10() +
+  xlab("Price") +
+  ylab("Number of Listings") +
+  ggtitle('Log_10 Airbnb Listing Prices')
+```
+
+### Description One
+
+The overall log price distrbution of Airbnb listings in New York City seems to 
+be fairly normal, although prices vary across many different factors, notably 
+location, size and room type.
+
+### Plot Two
+```{r echo=FALSE, Plot_Two}
+ggplot(aes(x=borough, y=availability_365), 
+       data=subset(airbnb, availability_365 > 0)) +
+  geom_boxplot() +
+  xlab('Borough') +
+  ylab('Number of Days Available') +
+  ggtitle('Number of Days Available by Borough')
+```
+
+### Description Two
+
+Brooklyn and especially Manhattan has the highest volume of Airbnb listings, and 
+listings in these two boroughs are generally more expensive and in high demand. 
+However, the plot above demonstrates that hosts of the listings in Brooklyn and 
+Manhattan tend to make their homes available on Airbnb for considerably less 
+days in a year compared to hosts in the Bronx, Queens and Staten Island.
+
+### Plot Three
+```{r echo=FALSE, Plot_Three}
+ggplot(aes(x=bedrooms, y=price), data = subset(airbnb, cancellation_policy %in% 
+                                                 c('flexible', 'moderate', 
+                                                   'strict'))) +
+  geom_line(stat='summary', fun.y=median, aes(color = cancellation_policy)) +
+  ggtitle('Price by Number of Bedrooms and Cancellation Policy') +
+  labs(color="Cancellation Policy") +
+  xlab('Number of Bedrooms') +
+  ylab('Median Price') +
+  xlim(c(0,5))
+```
+
+### Description Three
+
+The above is a plot of the relationship between a listing's price and its size, 
+grouped by 3 types of cancellation policies: flexible, moderate or strict. It 
+tells us that for the same number of bed rooms, cheaper listings tend to have a 
+more flexible cancellation policy. Although the price premium attached to strict 
+cancellation policies is not significant, it was a rather surprising discovery.
+
+------
+
+# Reflection
+
+The Airbnb dataset contains information on more than 44,000 Airbnb listings in 
+New York City which are spread across 96 variables. The very first challenge was 
+to identify and isolate the variables that were relevant with what I was trying 
+to achieve. The need to be concise was constantly confronted by the fear of 
+missing out on something important. Working with such a large data set also 
+necessitated constant revision of previous findings. Throughout the project, I 
+constantly made discoveries that challenged initial observations and 
+assumptions. Nevertheless, this led to more insightful evaluation of the 
+relationships between certain features.
+
+Among the features that we have studied, the following have rather significant 
+correlations with price: the number of bedrooms, the borough in which the 
+listing is located in, room type, guests included and the listing's review 
+score. These features are able to provide a basic, albeit insufficient, 
+indication of the price of a particular Airbnb listing. Some surprising 
+relationships were discovered. For instance, a listing's review scores and 
+availability had less of an impact on price than we expected. We also discovered 
+that cheaper listings did not seem to attract a significantly greater amount of 
+bookings. Lastly, we found that listings with strict cancellation policies tend 
+to be more expensive than listings with flexible ones.
+
+The original data set is massive, and we have only taken into account 11 the 
+features we deemed interesting. However, there are many more features available 
+for even more in-depth analysis of the data. For instance, listings have 
+specific review scores for cleanliness, communication, location, value, etc. An 
+interesting question to ask here is which of these rating criteria do users 
+place the most emphasis on. Also, with data on how long the hosts have been 
+active on Airbnb as well as the number of listings each host has, we can see if 
+there are any trends that pertain more to 'experienced' hosts rather than 
+'inexperienced' ones. 
