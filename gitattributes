@@ -1,4 +1,7 @@
 $ cat .gitattributes
-*.html linguist-language=Java
-*.rmd linguist-language=Java
-*.pdf linguist-language=Java
+* linguist-vendored
+*.html linguist-vendored=true
+*.pdf linguist-vendored=true
+*.html linguist-language=R
+*.rmd linguist-language=R
+*.pdf linguist-language=R
