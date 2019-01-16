@@ -1,4 +1,3 @@
-* linguist-vendored
 *.html linguist-language=R
 *.rmd linguist-language=R
 *.pdf linguist-language=R
